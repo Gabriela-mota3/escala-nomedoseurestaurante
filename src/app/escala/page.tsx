@@ -15,6 +15,7 @@ import {
   somarDias,
 } from "@/lib/datas";
 import { Painel } from "@/components/Painel";
+import { turnoVisivel } from "@/config/restaurante";
 
 const MENSAGEM_SEM_VARIAVEIS =
   "As variáveis do Supabase não foram configuradas. Veja a tela Início.";
@@ -62,7 +63,7 @@ export default function EscalaDaSemana() {
         ]);
         if (t.error) throw t.error;
         if (f.error) throw f.error;
-        setTurnos(t.data ?? []);
+        setTurnos((t.data ?? []).filter((turno) => turnoVisivel(turno.nome)));
         setFuncionarios(f.data ?? []);
       } catch (e) {
         setErro(`Não foi possível carregar turnos e equipe. ${mensagemDeErro(e)}`);

@@ -134,7 +134,7 @@ export default function Equipe() {
       </div>
 
       {erro && <p className="cartao border-red-200 bg-red-50 text-red-800">{erro}</p>}
-      {carregando && <p className="text-neutral-600">Carregando...</p>}
+      {carregando && <p className="texto-fundo">Carregando...</p>}
 
       {!carregando && !erro && ativos.length === 0 && (
         <p className="cartao text-neutral-600">Nenhum funcionário ativo. Toque em “Adicionar funcionário”.</p>
@@ -164,7 +164,7 @@ export default function Equipe() {
 
       {inativos.length > 0 && (
         <section className="space-y-3">
-          <h2 className="pt-2 text-lg font-semibold text-neutral-600">
+          <h2 className="texto-fundo pt-2 text-lg font-semibold">
             Desativados ({inativos.length})
           </h2>
           <ul className="space-y-3">

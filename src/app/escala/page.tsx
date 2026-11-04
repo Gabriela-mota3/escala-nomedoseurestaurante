@@ -254,7 +254,7 @@ export default function EscalaDaSemana() {
               )}
             </section>
           )}
-          <p className="text-sm text-neutral-600">
+          <p className="texto-fundo text-sm font-medium">
             Toque numa célula para escolher quem trabalha. Arraste a grade para o lado para ver
             todos os dias.
           </p>

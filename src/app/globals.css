@@ -2,9 +2,10 @@
 
 /* Cores vêm de src/config/identidade.ts e são aplicadas no layout. */
 :root {
-  --cor-principal: #1f3a5f;
-  --cor-secundaria: #f4f1ea;
+  --cor-principal: #6d271c;
+  --cor-secundaria: #d5b25c;
   --cor-texto: #1a1a1a;
+  --cor-texto-fundo: #4a3222;
 }
 
 @theme inline {
@@ -22,18 +23,34 @@ body {
 
 /* Botões e campos grandes, pensados para o celular. */
 .botao {
-  @apply inline-flex items-center justify-center rounded-xl px-4 py-3 text-base font-semibold text-white shadow-sm active:scale-[0.98] disabled:opacity-50;
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-3 text-base font-semibold tracking-wide text-white shadow-md transition active:scale-[0.98] disabled:opacity-50;
   background: var(--cor-principal);
 }
 .botao-secundario {
-  @apply inline-flex items-center justify-center rounded-xl border px-4 py-3 text-base font-semibold shadow-sm active:scale-[0.98] disabled:opacity-50;
+  @apply inline-flex items-center justify-center rounded-xl border-2 px-4 py-3 text-base font-semibold tracking-wide shadow-sm transition active:scale-[0.98] disabled:opacity-50;
   border-color: var(--cor-principal);
   color: var(--cor-principal);
   background: white;
 }
 .campo {
-  @apply w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-base outline-none focus:border-neutral-500;
+  @apply w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-base outline-none;
+}
+.campo:focus {
+  border-color: var(--cor-principal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cor-principal) 20%, transparent);
 }
 .cartao {
-  @apply rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm;
+  @apply rounded-2xl border border-black/5 bg-white p-4 shadow-md;
+}
+
+/* Contorno visível ao navegar pelo teclado. */
+.botao:focus-visible,
+.botao-secundario:focus-visible {
+  outline: 3px solid var(--cor-principal);
+  outline-offset: 2px;
+}
+
+/* Textos escritos direto sobre o fundo colorido: tom escuro, fácil de ler. */
+.texto-fundo {
+  color: var(--cor-texto-fundo);
 }

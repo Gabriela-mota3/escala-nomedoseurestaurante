@@ -15,7 +15,8 @@ import {
   somarDias,
 } from "@/lib/datas";
 import { Painel } from "@/components/Painel";
-import { turnoVisivel } from "@/config/restaurante";
+import { regrasDaCasa, turnoVisivel } from "@/config/restaurante";
+import { chaveCelula, nomeCurto, verificarSemana } from "@/lib/regras";
 
 const MENSAGEM_SEM_VARIAVEIS =
   "As variáveis do Supabase não foram configuradas. Veja a tela Início.";
@@ -28,14 +29,6 @@ function mensagemDeErro(e: unknown): string {
   return String(e);
 }
 
-/** "Ana Souza" -> "Ana S." (cabe na célula do celular) */
-function nomeCurto(nome: string): string {
-  const partes = nome.trim().split(/\s+/);
-  return partes.length > 1 ? `${partes[0]} ${partes[partes.length - 1][0]}.` : partes[0];
-}
-
-const chaveCelula = (data: string, turnoId: string) => `${data}|${turnoId}`;
-
 export default function EscalaDaSemana() {
   const [segunda, setSegunda] = useState(() => inicioDaSemana(hojeISO()));
   const [turnos, setTurnos] = useState<Turno[]>([]);
@@ -47,6 +40,7 @@ export default function EscalaDaSemana() {
   );
   const [celula, setCelula] = useState<CelulaAberta | null>(null);
   const [salvandoId, setSalvandoId] = useState<string | null>(null);
+  const [verAlertas, setVerAlertas] = useState(false);
 
   const dias = useMemo(() => diasDaSemana(segunda), [segunda]);
   const hoje = hojeISO();
@@ -83,8 +77,10 @@ export default function EscalaDaSemana() {
       const { data, error } = await supabase()
         .from("escalas")
         .select("id, data, turno_id, funcionario_id")
-        .gte("data", inicio)
-        .lte("data", somarDias(inicio, 6));
+        // Inclui o domingo anterior e a segunda seguinte, para a regra de
+        // fechar e abrir na virada da semana.
+        .gte("data", somarDias(inicio, -1))
+        .lte("data", somarDias(inicio, 7));
       if (ultimaSemanaPedida.current !== inicio) return;
       if (error) throw error;
       setEscalas(data ?? []);
@@ -126,6 +122,13 @@ export default function EscalaDaSemana() {
     }
     return mapa;
   }, [escalas, funcionarioPorId]);
+
+  // Regras da casa (src/config/restaurante.ts) aplicadas à semana.
+  const resultado = useMemo(
+    () => verificarSemana({ dias, turnos, funcionarios, escalas, regras: regrasDaCasa }),
+    [dias, turnos, funcionarios, escalas],
+  );
+  const totalAlertas = resultado.alertas.length;
 
   async function alternar(f: Funcionario) {
     if (!celula || salvandoId) return;
@@ -176,6 +179,10 @@ export default function EscalaDaSemana() {
       .map((f) => ({ funcionario: f, marcado: escalados.has(f.id) }));
   }, [celula, funcionarios, porCelula]);
 
+  const avisosDaCelula = celula
+    ? (resultado.avisosPorCelula.get(chaveCelula(celula.data, celula.turno.id)) ?? [])
+    : [];
+
   const periodo = `${diaMes(dias[0])} a ${diaMes(dias[6])}/${dias[6].slice(0, 4)}`;
   const ehSemanaAtual = segunda === inicioDaSemana(hoje);
 
@@ -208,6 +215,45 @@ export default function EscalaDaSemana() {
 
       {turnos.length > 0 && (
         <>
+          {!carregando && (
+            <section
+              className="cartao"
+              style={
+                totalAlertas > 0
+                  ? { background: "#fef2f2", borderColor: "#fca5a5" }
+                  : { background: "#f0fdf4", borderColor: "#86efac" }
+              }
+              aria-live="polite"
+            >
+              {totalAlertas === 0 ? (
+                <p className="font-semibold text-green-800">✅ Nenhum alerta nesta semana</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-lg font-bold text-red-800">
+                      ⚠️ {totalAlertas} {totalAlertas === 1 ? "alerta" : "alertas"} nesta semana
+                    </p>
+                    <button
+                      type="button"
+                      className="botao-secundario"
+                      style={{ borderColor: "#b91c1c", color: "#b91c1c" }}
+                      onClick={() => setVerAlertas((v) => !v)}
+                      aria-expanded={verAlertas}
+                    >
+                      {verAlertas ? "Esconder alertas" : "Ver alertas"}
+                    </button>
+                  </div>
+                  {verAlertas && (
+                    <ul className="mt-3 list-disc space-y-1 pl-5 text-red-900">
+                      {resultado.alertas.map((a, i) => (
+                        <li key={i}>{a.texto}</li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </section>
+          )}
           <p className="text-sm text-neutral-600">
             Toque numa célula para escolher quem trabalha. Arraste a grade para o lado para ver
             todos os dias.
@@ -243,31 +289,50 @@ export default function EscalaDaSemana() {
                       </span>
                     </th>
                     {dias.map((dia) => {
-                      const lista = porCelula.get(chaveCelula(dia, turno.id)) ?? [];
+                      const chave = chaveCelula(dia, turno.id);
+                      const lista = porCelula.get(chave) ?? [];
+                      const avisos = resultado.avisosPorCelula.get(chave) ?? [];
+                      const pessoasEmAlerta = resultado.pessoasEmAlerta.get(chave);
+                      const comAlerta = avisos.length > 0;
                       return (
                         <td key={dia} className="border-b border-neutral-200 p-1 align-top">
                           <button
                             type="button"
                             onClick={() => setCelula({ data: dia, turno })}
-                            className="flex min-h-24 w-full flex-col items-stretch gap-1 rounded-lg p-1 text-left active:bg-neutral-100"
-                            aria-label={`${turno.nome} de ${DIAS_SEMANA[paraData(dia).getDay()]} ${diaMes(dia)}: ${lista.length} escalados`}
+                            className={`flex min-h-24 w-full flex-col items-stretch gap-1 rounded-lg border-2 p-1 text-left ${
+                              comAlerta
+                                ? "border-red-500 bg-red-50 active:bg-red-100"
+                                : "border-transparent active:bg-neutral-100"
+                            }`}
+                            aria-label={`${turno.nome} de ${DIAS_SEMANA[paraData(dia).getDay()]} ${diaMes(dia)}: ${lista.length} escalados${comAlerta ? `. Alerta: ${avisos.join("; ")}` : ""}`}
                           >
                             {lista.map((e) => {
                               const f = funcionarioPorId.get(e.funcionario_id);
+                              const pessoaEmAlerta = pessoasEmAlerta?.has(e.funcionario_id);
                               return (
                                 <span
                                   key={e.id}
-                                  className="block truncate rounded-md bg-neutral-100 px-2 py-1 text-sm"
+                                  className={`block truncate rounded-md px-2 py-1 text-sm ${
+                                    pessoaEmAlerta
+                                      ? "bg-red-600 font-semibold text-white"
+                                      : "bg-neutral-100"
+                                  }`}
                                 >
+                                  {pessoaEmAlerta && "⚠ "}
                                   {f ? nomeCurto(f.nome) : "?"}
                                 </span>
                               );
                             })}
-                            {lista.length === 0 && (
+                            {lista.length === 0 && !comAlerta && (
                               <span className="flex flex-1 items-center justify-center text-2xl text-neutral-300">
                                 +
                               </span>
                             )}
+                            {avisos.map((aviso) => (
+                              <span key={aviso} className="block text-xs font-semibold leading-tight text-red-700">
+                                {aviso}
+                              </span>
+                            ))}
                           </button>
                         </td>
                       );
@@ -285,6 +350,15 @@ export default function EscalaDaSemana() {
           titulo={`${celula.turno.nome} · ${DIAS_SEMANA[paraData(celula.data).getDay()]} ${diaMes(celula.data)}`}
           aoFechar={fecharCelula}
         >
+          {avisosDaCelula.length > 0 && (
+            <div className="mb-3 rounded-xl border border-red-300 bg-red-50 p-3 text-red-800" aria-live="polite">
+              {avisosDaCelula.map((aviso) => (
+                <p key={aviso} className="font-semibold">
+                  ⚠️ {aviso}
+                </p>
+              ))}
+            </div>
+          )}
           {opcoesDaCelula.length === 0 ? (
             <p className="text-neutral-600">Nenhum funcionário ativo. Cadastre na tela Equipe.</p>
           ) : (
